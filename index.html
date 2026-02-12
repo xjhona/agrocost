@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroCost - Dashboard de Riego</title>
+    
+    <!-- 1. Estilos Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. React y ReactDOM -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Prop Types (Necesario para Recharts) -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    
+    <!-- 4. Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 5. Librerías del Dashboard -->
+    <script src="https://unpkg.com/recharts@2.12.2/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { background-color: #f8fafc; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-in { animation: fadeIn 0.5s ease-out; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- INICIALIZACIÓN SEGURA ---
+        if (!window.React || !window.Recharts || !window.lucideReact) {
+            document.getElementById('root').innerHTML = `
+                <div style="padding: 20px; color: red; font-family: sans-serif;">
+                    <h1>Cargando librerías...</h1>
+                    <p>Si esto tarda mucho, verifica tu conexión a internet.</p>
+                </div>
+            `;
+        }
+
+        const { useState, useEffect, useMemo, useRef } = React;
+        const { 
+            PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+        } = window.Recharts;
+        
+        const { 
+            Upload, DollarSign, Package, PieChart: PieIcon, 
+            TrendingUp, Filter, Search, ArrowUpRight, Droplets, Activity, CheckCircle,
+            ArrowDownWideNarrow, ArrowUpWideNarrow, ListOrdered, Settings, Download
+        } = window.lucideReact;
+
+        // --- CONSTANTES ---
+        const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#EF4444', '#3B82F6'];
+
+        const DEMO_DATA = [
+            { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PVC-160-C10", descripcion: "Tuberia PVC-U ISO-1452 DN 160mm PN10 (UF)", unidad: "m", cantidad: 1200, precioUnitario: 12.50 },
+            { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PVC-110-C10", descripcion: "Tuberia PVC-U ISO-1452 DN 110mm PN10 (UF)", unidad: "m", cantidad: 850, precioUnitario: 8.90 },
+            { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PE-16-C4", descripcion: "Manguera PE Lateral 16mm Clase 4", unidad: "m", cantidad: 15000, precioUnitario: 0.22 },
+            { partida: "SISTEMA DE TUBERIAS", codigo: "0", descripcion: "Codo PVC 160mm x 90° (Pendiente codificar)", unidad: "und", cantidad: 12, precioUnitario: 22.00 },
+            { partida: "SISTEMA DE VALVULAS", codigo: "VAL-MAR-160", descripcion: "Válvula Mariposa Wafer 160mm con volante", unidad: "und", cantidad: 4, precioUnitario: 120.00 },
+            { partida: "SISTEMA DE VALVULAS", codigo: "VAL-AIR-2", descripcion: "Válvula de Aire Doble Efecto 2 pulgadas", unidad: "und", cantidad: 8, precioUnitario: 85.00 },
+            { partida: "SISTEMA DE VALVULAS", codigo: "S.C.", descripcion: "Accesorios varios de montaje válvulas", unidad: "gbl", cantidad: 1, precioUnitario: 400.00 },
+            { partida: "CABEZAL DE FILTRADO", codigo: "FIL-ANI-4", descripcion: "Banco de Batería Filtros Anillas 4\" Automático", unidad: "gbl", cantidad: 1, precioUnitario: 12000.00 },
+            { partida: "ELECTROBOMBA Y TABLEROS", codigo: "BOM-CEN-50HP", descripcion: "Electrobomba Centrífuga 50HP Eje Libre", unidad: "und", cantidad: 2, precioUnitario: 4800.00 },
+            { partida: "ELECTROBOMBA Y TABLEROS", codigo: "S/C", descripcion: "Instalación eléctrica y pruebas", unidad: "srv", cantidad: 1, precioUnitario: 950.00 },
+        ].map(item => ({ ...item, total: item.cantidad * item.precioUnitario }));
+
+        // --- COMPONENTES AUXILIARES ---
+        const MetricCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+                    <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+                    {subtext && <p className="text-xs text-slate-400 mt-2">{subtext}</p>}
+                </div>
+                <div className={`p-3 rounded-lg ${colorClass}`}>
+                    <Icon className="w-6 h-6 text-white" />
+                </div>
+            </div>
+        );
+
+        const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+            const RADIAN = Math.PI / 180;
+            const radius = innerRadius + (outerRadius - innerRadius) * 0.6; 
+            const x = cx + radius * Math.cos(-midAngle * RADIAN);
+            const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+            if (percent < 0.05) return null;
+
+            return (
+                <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold pointer-events-none drop-shadow-md">
+                    {`${(percent * 100).toFixed(2)}%`}
+                </text>
+            );
+        };
+
+        // --- COMPONENTE PRINCIPAL ---
+        const App = () => {
+            const [rawData, setRawData] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [successMsg, setSuccessMsg] = useState(null);
+            
+            // Configuración Moneda
+            const [currency, setCurrency] = useState('USD'); 
+            const [exchangeRate, setExchangeRate] = useState(3.75); 
+            const [showSettings, setShowSettings] = useState(false);
+
+            // Filtros
+            const [filterPartida, setFilterPartida] = useState('TODAS');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [sortOption, setSortOption] = useState('total-desc');
+
+            const dashboardRef = useRef(null);
+
+            useEffect(() => {
+                setRawData(DEMO_DATA);
+            }, []);
+
+            // --- LÓGICA MONEDA ---
+            const convertCurrency = (amount) => {
+                if (currency === 'USD') return amount;
+                return amount * exchangeRate;
+            };
+
+            const formatMoney = (amount) => {
+                const converted = convertCurrency(amount);
+                return new Intl.NumberFormat(currency === 'PEN' ? 'es-PE' : 'en-US', {
+                    style: 'currency',
+                    currency: currency,
+                    minimumFractionDigits: 2
+                }).format(converted);
+            };
+
+            // --- LÓGICA DATOS ---
+            const totalProjectCost = useMemo(() => rawData.reduce((sum, item) => sum + item.total, 0), [rawData]);
+
+            const dataByPartida = useMemo(() => {
+                const grouped = rawData.reduce((acc, item) => {
+                    const p = item.partida || "SIN CATEGORÍA";
+                    if (!acc[p]) acc[p] = { name: p, value: 0, itemsCount: 0 };
+                    acc[p].value += item.total;
+                    acc[p].itemsCount += 1;
+                    return acc;
+                }, {});
+                
+                return Object.values(grouped)
+                    .sort((a, b) => b.value - a.value)
+                    .map(item => ({
+                        ...item,
+                        impactVal: totalProjectCost > 0 ? (item.value / totalProjectCost) * 100 : 0
+                    }));
+            }, [rawData, totalProjectCost]);
+            
+            const topMaterials = useMemo(() => {
+                return [...rawData]
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 5)
+                    .map(item => ({
+                        name: item.descripcion.length > 20 ? item.descripcion.substring(0, 20) + '...' : item.descripcion,
+                        fullDesc: item.descripcion,
+                        value: item.total, 
+                        displayValue: convertCurrency(item.total),
+                        partida: item.partida
+                    }));
+            }, [rawData, currency, exchangeRate]);
+
+            const filteredAndSortedData = useMemo(() => {
+                let data = rawData.filter(item => {
+                    const matchesPartida = filterPartida === 'TODAS' || item.partida === filterPartida;
+                    const matchesSearch = item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                          item.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+                    return matchesPartida && matchesSearch;
+                });
+
+                return data.sort((a, b) => {
+                    switch (sortOption) {
+                        case 'total-desc': return b.total - a.total;
+                        case 'total-asc': return a.total - b.total;
+                        case 'unit-desc': return b.precioUnitario - a.precioUnitario;
+                        case 'cant-desc': return b.cantidad - a.cantidad;
+                        default: return b.total - a.total;
+                    }
+                });
+            }, [rawData, filterPartida, searchTerm, sortOption]);
+
+            // --- MANEJO EXCEL ---
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setLoading(true);
+                setError(null);
+                setSuccessMsg(null);
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        if (!window.XLSX) throw new Error("Librería Excel no cargada.");
+                        
+                        const data = evt.target.result;
+                        const wb = window.XLSX.read(data, { type: 'array' });
+                        const wsname = wb.SheetNames[0];
+                        const ws = wb.Sheets[wsname];
+                        const jsonData = window.XLSX.utils.sheet_to_json(ws);
+
+                        const formattedData = jsonData.map((row, index) => {
+                            const partida = row['Partida'] || row['PARTIDA'] || row['Categoria'] || 'General';
+                            
+                            let rawCode = row['Codigo'] || row['CODIGO'] || row['Code'];
+                            let codigo = rawCode;
+                            const strCode = String(rawCode || '').trim().toUpperCase().replace(/\./g, '');
+                            if (!rawCode || strCode === '0' || strCode === 'SC') { codigo = 'S/C'; }
+
+                            const descripcion = row['Descripcion'] || row['DESCRIPCION'] || 'Sin descripción';
+                            const cantidad = Number(row['Cantidad'] || row['CANTIDAD'] || row['Cant.'] || 0);
+                            const precio = Number(row['Precio'] || row['PRECIO'] || row['Precio Unitario'] || row['PRECIO UNITARIO'] || row['Costo'] || 0);
+                            const unidad = row['Unidad'] || row['UNIDAD'] || 'und';
+                            const total = (row['Total'] || row['TOTAL']) ? Number(row['Total'] || row['TOTAL']) : (cantidad * precio);
+
+                            return { partida, codigo, descripcion, cantidad, precioUnitario: precio, total, unidad };
+                        }).filter(item => item.total > 0 || item.cantidad > 0);
+
+                        if (formattedData.length === 0) throw new Error("No se encontraron datos válidos.");
+
+                        setRawData(formattedData);
+                        setFilterPartida('TODAS');
+                        setSuccessMsg(`Se cargaron ${formattedData.length} items correctamente.`);
+                    } catch (err) {
+                        setError("Error: " + err.message);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            // --- PDF ---
+            const handleExportPDF = async () => {
+                if (!window.html2canvas || !window.jspdf) {
+                    alert("Cargando librerías PDF..."); return;
+                }
+                setLoading(true);
+                try {
+                    const element = dashboardRef.current;
+                    const canvas = await window.html2canvas(element, { scale: 1.5 });
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    doc.save('AgroCost_Reporte.pdf');
+                    setSuccessMsg("PDF generado correctamente.");
+                } catch (err) {
+                    console.error(err);
+                    setError("Error al generar PDF.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 animate-in">
+                    {/* Header */}
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-blue-600 p-2 rounded-lg">
+                                    <Droplets className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-900 leading-tight">AgroCost</h1>
+                                    <p className="text-xs text-slate-500 font-medium">Dashboard de Proyectos de Riego</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={() => setShowSettings(!showSettings)}
+                                    className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-slate-100 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+                                    title="Configurar Moneda"
+                                >
+                                    <Settings className="w-5 h-5" />
+                                </button>
+                                
+                                <button 
+                                    onClick={handleExportPDF}
+                                    className="hidden sm:flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                                >
+                                    <Download className="w-4 h-4" /> PDF
+                                </button>
+
+                                <label className={`cursor-pointer ${loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm`}>
+                                    {loading ? <Activity className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                    <span className="hidden sm:inline">{loading ? 'Procesando...' : 'Subir Excel'}</span>
+                                    <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" disabled={loading} />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Panel de Configuración */}
+                        {showSettings && (
+                            <div className="bg-slate-50 border-b border-slate-200 p-4">
+                                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center gap-6">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-slate-700">Moneda Visual:</span>
+                                        <div className="flex bg-white rounded-lg border border-slate-300 p-1">
+                                            <button onClick={() => setCurrency('USD')} className={`px-3 py-1 text-xs font-bold rounded ${currency === 'USD' ? 'bg-green-100 text-green-700' : 'text-slate-500'}`}>USD ($)</button>
+                                            <button onClick={() => setCurrency('PEN')} className={`px-3 py-1 text-xs font-bold rounded ${currency === 'PEN' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}>PEN (S/.)</button>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-slate-700">T.C. Venta:</span>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1.5 text-slate-400 text-xs">S/.</span>
+                                            <input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(Number(e.target.value))} step="0.01" className="pl-8 pr-3 py-1 w-24 border border-slate-300 rounded text-sm outline-none" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </header>
+
+                    <main ref={dashboardRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-slate-50">
+                        {error && <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2"><Activity className="w-5 h-5" />{error}</div>}
+                        {successMsg && <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2"><CheckCircle className="w-5 h-5" />{successMsg}</div>}
+
+                        {/* KPIs */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <MetricCard title={`Costo Total (${currency})`} value={formatMoney(totalProjectCost)} subtext={`${rawData.length} items`} icon={DollarSign} colorClass={currency === 'PEN' ? "bg-blue-500" : "bg-green-500"} />
+                            <MetricCard title="Partida Más Costosa" value={dataByPartida[0]?.name || "N/A"} subtext={`Impacto: ${dataByPartida[0]?.impactVal.toFixed(2)}%`} icon={TrendingUp} colorClass="bg-emerald-500" />
+                            <MetricCard title="Total de Partidas" value={dataByPartida.length} subtext="Sistemas" icon={Package} colorClass="bg-amber-500" />
+                            <MetricCard title="Promedio por Partida" value={formatMoney(dataByPartida.length ? totalProjectCost / dataByPartida.length : 0)} subtext="Media" icon={PieIcon} colorClass="bg-purple-500" />
+                        </div>
+
+                        {/* Gráficos */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-1 flex flex-col">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><PieIcon className="w-5 h-5 text-blue-500" /> Impacto</h2>
+                                <div className="flex-1 min-h-[300px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={dataByPartida} cx="50%" cy="50%" innerRadius={60} outerRadius={90} fill="#8884d8" paddingAngle={2} dataKey="value" onClick={(data) => setFilterPartida(data.name)} className="cursor-pointer" labelLine={false} label={renderCustomizedLabel}>
+                                                {dataByPartida.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                                            </Pie>
+                                            <Tooltip formatter={(value) => [formatMoney(value), 'Costo']} />
+                                            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><ArrowUpRight className="w-5 h-5 text-red-500" /> Top 5 Costos (Pareto)</h2>
+                                <div className="flex-1 min-h-[300px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={topMaterials} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                                            <XAxis type="number" hide />
+                                            <YAxis dataKey="name" type="category" width={180} tick={{fontSize: 11, fill: '#64748b'}} />
+                                            <Tooltip formatter={(value, name, props) => [formatMoney(props.payload.value), "Costo Total"]} labelFormatter={(label, payload) => payload[0]?.payload.fullDesc || label} />
+                                            <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]}>
+                                                {topMaterials.map((entry, index) => (<Cell key={`cell-${index}`} fill={index === 0 ? '#EF4444' : '#3B82F6'} />))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabla */}
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-6 border-b border-slate-200 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-slate-50">
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800">Desglose</h2>
+                                    <p className="text-sm text-slate-500">{filterPartida === 'TODAS' ? 'Todo el proyecto' : filterPartida}</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                                    <div className="flex bg-white rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-300">
+                                        <button onClick={() => setSortOption('total-desc')} className={`px-3 py-2 text-xs font-medium flex gap-1 ${sortOption === 'total-desc' ? 'bg-blue-50 text-blue-600' : 'text-slate-600'}`}><ArrowDownWideNarrow className="w-3.5 h-3.5" /> Total</button>
+                                        <button onClick={() => setSortOption('cant-desc')} className={`px-3 py-2 text-xs font-medium flex gap-1 ${sortOption === 'cant-desc' ? 'bg-blue-50 text-blue-600' : 'text-slate-600'}`}><ArrowUpWideNarrow className="w-3.5 h-3.5" /> Cant.</button>
+                                    </div>
+                                    <select className="pl-2 pr-8 py-2 rounded-lg border border-slate-300 text-sm bg-white" value={filterPartida} onChange={(e) => setFilterPartida(e.target.value)}>
+                                        <option value="TODAS">Todas las Partidas</option>
+                                        {dataByPartida.map(p => (<option key={p.name} value={p.name}>{p.name}</option>))}
+                                    </select>
+                                    <input type="text" placeholder="Buscar..." className="pl-4 pr-4 py-2 rounded-lg border border-slate-300 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-100 text-slate-600 text-xs uppercase font-semibold">
+                                            <th className="p-4 border-b">Partida</th>
+                                            <th className="p-4 border-b">Código</th>
+                                            <th className="p-4 border-b">Descripción</th>
+                                            <th className="p-4 border-b text-right">Cant.</th>
+                                            <th className="p-4 border-b text-right">Total ({currency === 'PEN' ? 'S/.' : '$'})</th>
+                                            <th className="p-4 border-b text-center">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                                        {filteredAndSortedData.map((item, index) => {
+                                            const partidaTotal = dataByPartida.find(p => p.name === item.partida)?.value || 1;
+                                            const percentOfPartida = (item.total / partidaTotal) * 100;
+                                            return (
+                                                <tr key={index} className="hover:bg-blue-50">
+                                                    <td className="p-4 font-medium"><span className="inline-block w-2 h-2 rounded-full mr-2" style={{backgroundColor: COLORS[dataByPartida.findIndex(p => p.name === item.partida) % COLORS.length]}}></span>{item.partida}</td>
+                                                    <td className="p-4 font-mono text-xs text-slate-500">{item.codigo}</td>
+                                                    <td className="p-4 max-w-xs truncate" title={item.descripcion}>{item.descripcion}</td>
+                                                    <td className="p-4 text-right">{item.cantidad.toLocaleString()}</td>
+                                                    <td className="p-4 text-right font-bold">{formatMoney(item.total)}</td>
+                                                    <td className="p-4 text-center text-xs text-slate-400">{percentOfPartida.toFixed(1)}%</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
