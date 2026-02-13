@@ -200,8 +200,12 @@
             const filteredAndSortedData = useMemo(() => {
                 let data = rawData.filter(item => {
                     const matchesPartida = filterPartida === 'TODAS' || item.partida === filterPartida;
-                    const matchesSearch = item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                          item.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+                    // Corrección del Error: Convertir a String antes de usar toLowerCase
+                    const codeStr = String(item.codigo || '').toLowerCase();
+                    const descStr = String(item.descripcion || '').toLowerCase();
+                    const searchStr = searchTerm.toLowerCase();
+                    
+                    const matchesSearch = descStr.includes(searchStr) || codeStr.includes(searchStr);
                     return matchesPartida && matchesSearch;
                 });
 
@@ -240,9 +244,11 @@
                             const partida = row['Partida'] || row['PARTIDA'] || row['Categoria'] || 'General';
                             
                             let rawCode = row['Codigo'] || row['CODIGO'] || row['Code'];
-                            let codigo = rawCode;
-                            const strCode = String(rawCode || '').trim().toUpperCase().replace(/\./g, '');
-                            if (!rawCode || strCode === '0' || strCode === 'SC') { codigo = 'S/C'; }
+                            // Corrección Preventiva: Asegurar que el código sea String al cargar
+                            let codigo = (rawCode !== undefined && rawCode !== null) ? String(rawCode) : '';
+                            
+                            const strCode = codigo.trim().toUpperCase().replace(/\./g, '');
+                            if (!codigo || strCode === '0' || strCode === 'SC') { codigo = 'S/C'; }
 
                             const descripcion = row['Descripcion'] || row['DESCRIPCION'] || 'Sin descripción';
                             const cantidad = Number(row['Cantidad'] || row['CANTIDAD'] || row['Cant.'] || 0);
@@ -507,3 +513,4 @@
     </script>
 </body>
 </html>
+
