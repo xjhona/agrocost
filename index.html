@@ -33,6 +33,12 @@
         body { background-color: #f8fafc; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-in { animation: fadeIn 0.5s ease-out; }
+        /* Ajuste para inputs numéricos sin flechas */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
     </style>
 </head>
 <body>
@@ -57,7 +63,6 @@
         } = window.Recharts;
 
         // --- ICONOS INTEGRADOS (SVG) ---
-        // Eliminamos la dependencia externa de Lucide para evitar errores de carga UMD
         const IconBase = ({ d, className, ...props }) => (
             <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -86,11 +91,12 @@
         const Package = (props) => <IconBase {...props} d={["M16.5 9.4l-9-5.19", "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z", "M3.27 6.96L12 12.01l8.73-5.05", "M12 22.08V12"]} />;
         const PieIcon = (props) => <IconBase {...props} d={["M21.21 15.89A10 10 0 1 1 8 2.83", "M22 12A10 10 0 0 0 12 2v10z"]} />;
         const ArrowUpRight = (props) => <IconBase {...props} d={["M7 7h10v10", "M7 17L17 7"]} />;
-        const ArrowDownWideNarrow = (props) => <IconBase {...props} d={["M3 16h18", "M7 20h10", "M10 12h4", "M3 8h18", "M3 4h18"]} />; // Simplificado como lista para este caso
-        const ArrowUpWideNarrow = (props) => <IconBase {...props} d={["M3 16h18", "M7 20h10", "M10 12h4", "M3 8h18", "M3 4h18"]} transform="scale(1, -1) translate(0, -24)" />; // Hack visual simple
+        const ArrowDownWideNarrow = (props) => <IconBase {...props} d={["M3 16h18", "M7 20h10", "M10 12h4", "M3 8h18", "M3 4h18"]} />; 
+        const ArrowUpWideNarrow = (props) => <IconBase {...props} d={["M3 16h18", "M7 20h10", "M10 12h4", "M3 8h18", "M3 4h18"]} transform="scale(1, -1) translate(0, -24)" />; 
         const ListOrdered = (props) => <IconBase {...props} d={["M10 6h11", "M10 12h11", "M10 18h11", "M4 6h1v4", "M4 10h2", "M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"]} />;
         const Filter = (props) => <IconBase {...props} d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />;
         const Search = (props) => <IconBase {...props} d={["M21 21l-6-6", "M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z"]} />;
+        const LayoutDashboard = (props) => <IconBase {...props} d={["M3 3h7v7H3z", "M14 3h7v7h-7z", "M14 14h7v7h-7z", "M3 14h7v7H3z"]} />;
 
         // --- CONSTANTES ---
         const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#EF4444', '#3B82F6'];
@@ -99,13 +105,10 @@
             { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PVC-160-C10", descripcion: "Tuberia PVC-U ISO-1452 DN 160mm PN10 (UF)", unidad: "m", cantidad: 1200, precioUnitario: 12.50 },
             { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PVC-110-C10", descripcion: "Tuberia PVC-U ISO-1452 DN 110mm PN10 (UF)", unidad: "m", cantidad: 850, precioUnitario: 8.90 },
             { partida: "SISTEMA DE TUBERIAS", codigo: "TUB-PE-16-C4", descripcion: "Manguera PE Lateral 16mm Clase 4", unidad: "m", cantidad: 15000, precioUnitario: 0.22 },
-            { partida: "SISTEMA DE TUBERIAS", codigo: "0", descripcion: "Codo PVC 160mm x 90° (Pendiente codificar)", unidad: "und", cantidad: 12, precioUnitario: 22.00 },
             { partida: "SISTEMA DE VALVULAS", codigo: "VAL-MAR-160", descripcion: "Válvula Mariposa Wafer 160mm con volante", unidad: "und", cantidad: 4, precioUnitario: 120.00 },
-            { partida: "SISTEMA DE VALVULAS", codigo: "VAL-AIR-2", descripcion: "Válvula de Aire Doble Efecto 2 pulgadas", unidad: "und", cantidad: 8, precioUnitario: 85.00 },
-            { partida: "SISTEMA DE VALVULAS", codigo: "S.C.", descripcion: "Accesorios varios de montaje válvulas", unidad: "gbl", cantidad: 1, precioUnitario: 400.00 },
             { partida: "CABEZAL DE FILTRADO", codigo: "FIL-ANI-4", descripcion: "Banco de Batería Filtros Anillas 4\" Automático", unidad: "gbl", cantidad: 1, precioUnitario: 12000.00 },
             { partida: "ELECTROBOMBA Y TABLEROS", codigo: "BOM-CEN-50HP", descripcion: "Electrobomba Centrífuga 50HP Eje Libre", unidad: "und", cantidad: 2, precioUnitario: 4800.00 },
-            { partida: "ELECTROBOMBA Y TABLEROS", codigo: "S/C", descripcion: "Instalación eléctrica y pruebas", unidad: "srv", cantidad: 1, precioUnitario: 950.00 },
+            { partida: "AUTOMATIZACIÓN", codigo: "RTU-900", descripcion: "Unidad Remota RTU RFG5-900L", unidad: "und", cantidad: 6, precioUnitario: 883.85 },
         ].map(item => ({ ...item, total: item.cantidad * item.precioUnitario }));
 
         // --- COMPONENTES AUXILIARES ---
@@ -122,21 +125,6 @@
             </div>
         );
 
-        const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-            const RADIAN = Math.PI / 180;
-            const radius = innerRadius + (outerRadius - innerRadius) * 0.6; 
-            const x = cx + radius * Math.cos(-midAngle * RADIAN);
-            const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-            if (percent < 0.05) return null;
-
-            return (
-                <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold pointer-events-none drop-shadow-md">
-                    {`${(percent * 100).toFixed(2)}%`}
-                </text>
-            );
-        };
-
         // --- COMPONENTE PRINCIPAL ---
         const App = () => {
             const [rawData, setRawData] = useState([]);
@@ -144,10 +132,11 @@
             const [error, setError] = useState(null);
             const [successMsg, setSuccessMsg] = useState(null);
             
-            // Configuración Moneda
+            // Configuración
             const [currency, setCurrency] = useState('USD'); 
             const [exchangeRate, setExchangeRate] = useState(3.75); 
             const [showSettings, setShowSettings] = useState(false);
+            const [projectArea, setProjectArea] = useState(""); // Estado para Hectáreas
 
             // Filtros
             const [filterPartida, setFilterPartida] = useState('TODAS');
@@ -371,7 +360,38 @@
 
                         {/* KPIs */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <MetricCard title={`Costo Total (${currency})`} value={formatMoney(totalProjectCost)} subtext={`${rawData.length} items`} icon={DollarSign} colorClass={currency === 'PEN' ? "bg-blue-500" : "bg-green-500"} />
+                            {/* Costo Total con Cálculo por Hectárea */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-500 mb-1">{`Costo Total (${currency})`}</p>
+                                        <h3 className="text-2xl font-bold text-slate-800">{formatMoney(totalProjectCost)}</h3>
+                                    </div>
+                                    <div className={`p-3 rounded-lg ${currency === 'PEN' ? "bg-blue-500" : "bg-green-500"}`}>
+                                        <DollarSign className="w-6 h-6 text-white" />
+                                    </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-1 justify-between">
+                                        <span className="text-xs text-slate-500">Área (Has):</span>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            step="0.1"
+                                            className="w-24 px-2 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                                            value={projectArea}
+                                            onChange={(e) => setProjectArea(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-700 text-right bg-slate-50 p-1 rounded">
+                                        {projectArea && Number(projectArea) > 0 
+                                            ? `${formatMoney(totalProjectCost / Number(projectArea))} / ha` 
+                                            : "--- / ha"}
+                                    </div>
+                                </div>
+                            </div>
+
                             <MetricCard title="Partida Más Costosa" value={dataByPartida[0]?.name || "N/A"} subtext={`Impacto: ${dataByPartida[0]?.impactVal.toFixed(2)}%`} icon={TrendingUp} colorClass="bg-emerald-500" />
                             <MetricCard title="Total de Partidas" value={dataByPartida.length} subtext="Sistemas" icon={Package} colorClass="bg-amber-500" />
                             <MetricCard title="Promedio por Partida" value={formatMoney(dataByPartida.length ? totalProjectCost / dataByPartida.length : 0)} subtext="Media" icon={PieIcon} colorClass="bg-purple-500" />
@@ -384,7 +404,20 @@
                                 <div className="flex-1 min-h-[300px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
-                                            <Pie data={dataByPartida} cx="50%" cy="50%" innerRadius={60} outerRadius={90} fill="#8884d8" paddingAngle={2} dataKey="value" onClick={(data) => setFilterPartida(data.name)} className="cursor-pointer" labelLine={false} label={renderCustomizedLabel}>
+                                            <Pie 
+                                                data={dataByPartida} 
+                                                cx="50%" 
+                                                cy="50%" 
+                                                innerRadius={50} // Radio interno un poco más pequeño
+                                                outerRadius={70} // Radio externo reducido para dar espacio a etiquetas
+                                                fill="#8884d8" 
+                                                paddingAngle={2} 
+                                                dataKey="value" 
+                                                onClick={(data) => setFilterPartida(data.name)} 
+                                                className="cursor-pointer" 
+                                                labelLine={true} // Activar líneas guía
+                                                label={({ percent }) => `${(percent * 100).toFixed(1)}%`} // Etiqueta externa simple
+                                            >
                                                 {dataByPartida.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
                                             </Pie>
                                             <Tooltip formatter={(value) => [formatMoney(value), 'Costo']} />
@@ -439,6 +472,7 @@
                                             <th className="p-4 border-b">Código</th>
                                             <th className="p-4 border-b">Descripción</th>
                                             <th className="p-4 border-b text-right">Cant.</th>
+                                            <th className="p-4 border-b text-right">P. Unit. ({currency === 'PEN' ? 'S/.' : '$'})</th>
                                             <th className="p-4 border-b text-right">Total ({currency === 'PEN' ? 'S/.' : '$'})</th>
                                             <th className="p-4 border-b text-center">%</th>
                                         </tr>
@@ -453,6 +487,7 @@
                                                     <td className="p-4 font-mono text-xs text-slate-500">{item.codigo}</td>
                                                     <td className="p-4 max-w-xs truncate" title={item.descripcion}>{item.descripcion}</td>
                                                     <td className="p-4 text-right">{item.cantidad.toLocaleString()}</td>
+                                                    <td className="p-4 text-right font-medium text-slate-600">{formatMoney(item.precioUnitario)}</td>
                                                     <td className="p-4 text-right font-bold">{formatMoney(item.total)}</td>
                                                     <td className="p-4 text-center text-xs text-slate-400">{percentOfPartida.toFixed(1)}%</td>
                                                 </tr>
